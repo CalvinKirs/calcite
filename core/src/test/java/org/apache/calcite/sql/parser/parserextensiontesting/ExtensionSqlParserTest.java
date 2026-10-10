@@ -67,16 +67,22 @@ class ExtensionSqlParserTest extends SqlParserTest {
    * <a href="https://issues.apache.org/jira/browse/CALCITE-7820">[CALCITE-7820]
    * nonReservedKeywordsToRemove is ignored by the parser template</a>. */
   @Test void testNonReservedKeywordsToRemove() {
-    assertThat(fixture().parser().getMetadata().isReservedWord("ADD"), is(true));
-    sql("select ^add^ from t")
-        .fails("(?s).*Encountered \"add\" at .*");
-    sql("select \"ADD\" from t")
-        .ok("SELECT `ADD`\nFROM `T`");
-
     final SqlParserFixture defaultFixture = fixture()
         .withConfig(c -> c.withParserFactory(SqlParserImpl.FACTORY));
-    assertThat(defaultFixture.parser().getMetadata().isReservedWord("ADD"), is(false));
-    defaultFixture.sql("select add from t")
-        .ok("SELECT `ADD`\nFROM `T`");
+    // ABSENT and ABSOLUTE are the first keywords of groups 1 and 2 before filtering.
+    for (String keyword : new String[] {"ABSENT", "ABSOLUTE", "ADD"}) {
+      assertThat(fixture().parser().getMetadata().isReservedWord(keyword), is(true));
+      sql("select ^" + keyword + "^ from t")
+          .fails("(?s)Incorrect syntax near the keyword '" + keyword
+              + "' at line 1, column 8.*");
+      sql("select \"" + keyword + "\" from t")
+          .ok("SELECT `" + keyword + "`\nFROM `T`");
+
+      assertThat(defaultFixture.parser().getMetadata().isReservedWord(keyword), is(false));
+      defaultFixture.sql("select " + keyword + " from t")
+          .ok("SELECT `" + keyword + "`\nFROM `T`");
+    }
+    sql("select action, ada from t")
+        .ok("SELECT `ACTION`, `ADA`\nFROM `T`");
   }
 }
