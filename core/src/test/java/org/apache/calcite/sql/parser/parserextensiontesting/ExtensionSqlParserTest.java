@@ -19,9 +19,13 @@ package org.apache.calcite.sql.parser.parserextensiontesting;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParserFixture;
 import org.apache.calcite.sql.parser.SqlParserTest;
+import org.apache.calcite.sql.parser.impl.SqlParserImpl;
 
 import org.hamcrest.core.IsNull;
 import org.junit.jupiter.api.Test;
+
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
  * Testing for extension functionality of the base SQL parser impl.
@@ -57,5 +61,22 @@ class ExtensionSqlParserTest extends SqlParserTest {
         .node(new IsNull<SqlNode>());
     sql("DESCRIBE SEA ^POWER^")
         .fails("(?s)Incorrect syntax near the keyword 'POWER' at line 1, column 14.*");
+  }
+
+  /** Test case for
+   * <a href="https://issues.apache.org/jira/browse/CALCITE-7820">[CALCITE-7820]
+   * nonReservedKeywordsToRemove is ignored by the parser template</a>. */
+  @Test void testNonReservedKeywordsToRemove() {
+    assertThat(fixture().parser().getMetadata().isReservedWord("ADD"), is(true));
+    sql("select ^add^ from t")
+        .fails("(?s).*Encountered \"add\" at .*");
+    sql("select \"ADD\" from t")
+        .ok("SELECT `ADD`\nFROM `T`");
+
+    final SqlParserFixture defaultFixture = fixture()
+        .withConfig(c -> c.withParserFactory(SqlParserImpl.FACTORY));
+    assertThat(defaultFixture.parser().getMetadata().isReservedWord("ADD"), is(false));
+    defaultFixture.sql("select add from t")
+        .ok("SELECT `ADD`\nFROM `T`");
   }
 }
